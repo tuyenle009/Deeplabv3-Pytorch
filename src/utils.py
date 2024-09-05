@@ -1,54 +1,8 @@
 import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-
-class AverageMeter(object):
-    def __init__(self):
-        self.val = None
-        self.sum = None
-        self.cnt = None
-        self.avg = None
-        self.ema = None
-        self.initialized = False
-
-    def update(self, val, n=1):
-        if not self.initialized:
-            self.initialize(val, n)
-        else:
-            self.add(val, n)
-
-    def initialize(self, val, n):
-        self.val = val
-        self.sum = val * n
-        self.cnt = n
-        self.avg = val
-        self.ema = val
-        self.initialized = True
-
-    def add(self, val, n):
-        self.val = val
-        self.sum += val * n
-        self.cnt += n
-        self.avg = self.sum / self.cnt
-        self.ema = self.ema * 0.99 + self.val * 0.01
-
-
-def inter_and_union(pred, mask, num_class):
-    pred = np.asarray(pred, dtype=np.uint8).copy()
-    mask = np.asarray(mask, dtype=np.uint8).copy()
-
-    # 255 -> 0
-    pred += 1
-    mask += 1
-    pred = pred * (mask > 0)
-
-    inter = pred * (pred == mask)
-    (area_inter, _) = np.histogram(inter, bins=num_class, range=(1, num_class))
-    (area_pred, _) = np.histogram(pred, bins=num_class, range=(1, num_class))
-    (area_mask, _) = np.histogram(mask, bins=num_class, range=(1, num_class))
-    area_union = area_pred + area_mask - area_inter
-
-    return (area_inter, area_union)
+import torch
+import copy
 
 
 #Define trainform to images
@@ -69,3 +23,45 @@ def img_transform(trainsize= 256):
         ToTensorV2(),
     ])
     return train_transform, test_transform
+
+class EarlyStopping:
+    def __init__(self, patience=5, min_delta=0, restore_best_weights=False):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.restore_best_weights = restore_best_weights
+        self.best_model = None
+        self.best_loss = None
+        self.counter = 0
+        self.status = ""
+
+    def __call__(self, model, val_loss):
+        """
+           Call method to check if early stopping is triggered.
+
+           Args:
+               model (torch.nn.Module): The model being trained.
+               val_loss (float): The validation loss of the current epoch.
+
+           Returns:
+               bool: True if early stopping should occur, False otherwise.
+       """
+        if self.best_loss is None:
+            self.best_loss = val_loss
+            self.best_model = copy.deepcopy(model.state_dict())
+
+        elif self.best_loss - val_loss > self.min_delta:
+            self.best_model = copy.deepcopy(model.state_dict())
+            self.best_loss = val_loss
+            self.counter = 0
+
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.status = f"Stop on {self.counter}"
+                if self.restore_best_weights:
+                    model.load_state_dict(self.best_model)
+                return True  # Stop training
+        self.status = f"{self.counter}/{self.patience}"
+        return False # Continue training
+
+

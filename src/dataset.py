@@ -2,11 +2,7 @@ from torch.utils.data import Dataset
 import os
 import cv2
 import numpy as np
-
-
 from pycocotools.coco import COCO
-
-
 
 SEG_COLORMAP = [
     [0, 0, 0],  # Class 0: Background (Black)
@@ -15,8 +11,9 @@ SEG_COLORMAP = [
     [180, 0, 0]  # Class 3: Red - Person
 ]
 
+
 class SegDataset(Dataset):
-    def __init__(self, root="/kaggle/working/Semantic-Segmentation-3", image_set="train", transform=None):
+    def __init__(self, root="data/Semantic Segmentation.v3i.coco-segmentation", image_set="train", transform=None):
 
         if image_set not in ["train", "valid"]:
             raise ValueError(f"Invalid image_set: '{image_set}'. Must be 'train' or 'valid'.")
